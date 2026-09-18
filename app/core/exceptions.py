@@ -31,3 +31,8 @@ class UnauthorizedException(AppError):
 class ForbiddenException(AppError):
     def __init__(self, message: str = "Forbidden") -> None:
         super().__init__(message, status.HTTP_403_FORBIDDEN)
+
+
+class BadRequestException(AppError):
+    def __init__(self, message: str = "Bad Request") -> None:
+        super().__init__(message, status.HTTP_400_BAD_REQUEST)

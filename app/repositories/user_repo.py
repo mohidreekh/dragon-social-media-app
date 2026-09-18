@@ -6,10 +6,10 @@ from fastapi import Depends
 from app.models.user import User
 from app.models.follow import Follow
 from app.models.post import Post
-from app.db.session import get_db
+from app.core.dependencies import SessionDep
 
 class UserRepository:
-    def __init__(self, db: Annotated[Session, Depends(get_db)]):
+    def __init__(self, db: SessionDep):
         self.db = db
 
     def get_by_id(self, id: UUID):
@@ -67,6 +67,15 @@ class UserRepository:
         self.db.add(follow)
         self.db.flush()
         self.db.refresh(follow)
+        return follow
+
+    def unfollow_user(self, follower_id: UUID, followed_id: UUID) -> None:
+        self.db.query(Follow).filter(
+            Follow.follower_id == follower_id,
+            Follow.followed_id == followed_id,
+        ).delete()
+        self.db.flush()
+        
     def get_all(self, skip: int = 0, limit: int = 100) -> list[User]:
         return (
             self.db.query(User)

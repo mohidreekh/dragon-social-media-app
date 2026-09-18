@@ -14,8 +14,11 @@ from app.core.errors import (
 )
 from app.core.exceptions import AppError
 from app.db.session import Base, engine
+from app.routes.auth import router as auth_router
 from app.routes.health import router as health_router
 from app.routes.users import router as user_router
+from app.routes.posts import router as post_router
+
 
 
 @asynccontextmanager
@@ -48,8 +51,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.include_router(auth_router, prefix="/api")
     app.include_router(health_router, prefix="/api")
     app.include_router(user_router, prefix="/api")
+    app.include_router(post_router, prefix="/api")
 
     return app
 

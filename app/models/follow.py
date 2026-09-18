@@ -31,10 +31,12 @@ class Follow(Base):
 
     follower = relationship(
         "User",
-        foreign_keys=[follower_id]
+        foreign_keys=[follower_id],
+        overlaps="following"
     )
 
     followed = relationship(
         "User",
-        foreign_keys=[followed_id]
-    )
+        foreign_keys=[followed_id],
+        overlaps="followers"
+    )

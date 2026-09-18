@@ -1,17 +1,17 @@
 from typing import Annotated
 from uuid import UUID
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.core.dependencies import UserServiceDep
+from app.core.dependencies import CurrentUserDep
 from app.services.user_service import UserService
-from app.core.dependencies import get_user_service
 from app.schemas.user import (
     UserCreate,
     UserResponse,
     ProfileResponse,
-    FollowRequest,
     FollowResponse,
 )
+
+UserServiceDep = Annotated[UserService, Depends()]
 
 router = APIRouter(
     prefix="/users",
@@ -21,7 +21,8 @@ router = APIRouter(
 
 @router.post(
     "/",
-    response_model=UserResponse
+    response_model=UserResponse,
+    status_code=201
 )
 def add_user(
     data: UserCreate,
@@ -30,32 +31,60 @@ def add_user(
     return service.create_user(data)
 
 
+@router.get("/me", response_model=ProfileResponse)
+def get_my_profile(
+    current_user: CurrentUserDep,
+    service: UserServiceDep
+):
+    return service.get_user_profile(current_user.user_id)
+
+
 @router.get("/{id}", response_model=ProfileResponse)
-def get_user_profile(id: UUID, service: UserServiceDep):
+def get_user_profile(
+    id: UUID,
+    current_user: CurrentUserDep,
+    service: UserServiceDep
+):
     return service.get_user_profile(id)
 
 
 @router.post("/{id}/follow", response_model=FollowResponse, status_code=201)
 def follow_user(
     id: UUID,
-    data: FollowRequest,
+    current_user: CurrentUserDep,
     service: UserServiceDep
 ):
-    service.follow_user(follower_id=data.follower_id, followed_id=id)
+    service.follow_user(follower_id=current_user.user_id, followed_id=id)
     return FollowResponse(
         message="Successfully followed user",
-        follower_id=data.follower_id,
+        follower_id=current_user.user_id,
+        followed_id=id
+    )
+
+
+@router.delete("/{id}/follow", response_model=FollowResponse)
+def unfollow_user(
+    id: UUID,
+    current_user: CurrentUserDep,
+    service: UserServiceDep
+):
+    service.unfollow_user(follower_id=current_user.user_id, followed_id=id)
+    return FollowResponse(
+        message="Successfully unfollowed user",
+        follower_id=current_user.user_id,
         followed_id=id
     )
 
 
 @router.get("/", response_model=list[UserResponse])
 def get_all_users(
+    current_user: CurrentUserDep,
     service: UserServiceDep,
     skip: int = 0,
     limit: int = 100
 ):
     return service.get_all_users(skip=skip, limit=limit)
+
 
 
 

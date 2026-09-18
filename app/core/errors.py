@@ -40,6 +40,16 @@ async def http_error_handler(request: Request, exc: HTTPException) -> JSONRespon
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    for err in exc.errors():
+        loc = err.get("loc", [])
+        if "body" in loc and err.get("type") in ("missing", "value_error.missing", "string_type"):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=_error_body(
+                    status.HTTP_400_BAD_REQUEST,
+                    "Body is required",
+                ),
+            )
     details = [
         {
             "field": " -> ".join(str(loc) for loc in err.get("loc", [])),
@@ -48,9 +58,9 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         for err in exc.errors()
     ]
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_400_BAD_REQUEST,
         content=_error_body(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_400_BAD_REQUEST,
             "Validation failed",
             details=details,
         ),
