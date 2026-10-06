@@ -1,32 +1,51 @@
+from fastapi import Cookie
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import UnauthorizedException
+from app.core.security.jwt import decode_access_token
 from app.db.session import get_db
-from app.repositories.user_repo import UserRepository
-from app.services.user_service import UserService
+from app.models.user import User, UserStatus
+
+# Common Database Session Dependency for any Service / Repository
+SessionDep = Annotated[Session, Depends(get_db)]
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+def get_current_user(
+    token_from_header: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    access_token: Annotated[str | None, Cookie()] = None,
+    db: SessionDep = None,
+) -> User:
+    token = token_from_header or access_token
+    print("TOKEN:", token)
+    
+    if not token or token in ("null", "undefined"):
+        raise UnauthorizedException("Not authenticated")
+
+    payload = decode_access_token(token)
+
+    user_id_str: str | None = payload.get("sub")
+    if not user_id_str:
+        raise UnauthorizedException("Invalid token payload")
+
+    try:
+        user_id = UUID(user_id_str)
+    except ValueError:
+        raise UnauthorizedException("Invalid user ID format in token")
+
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise UnauthorizedException("User not found")
+
+    if user.status == UserStatus.BANNED:
+        raise UnauthorizedException("User account is banned")
+
+    return user
 
 
-SessionDep = Annotated[
-    Session,
-    Depends(get_db)
-]
-
-
-def get_user_repository(
-    db: SessionDep
-):
-    return UserRepository(db)
-
-
-def get_user_service(
-    repo: Annotated[UserRepository, Depends(get_user_repository)],
-) -> UserService:
-    return UserService(repo)
-
-
-UserServiceDep = Annotated[
-    UserService,
-    Depends(get_user_service)
-]
+CurrentUserDep = Annotated[User, Depends(get_current_user)]

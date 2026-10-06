@@ -12,28 +12,37 @@ class UserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str
-    profile_image: str
+    profile_image: str | None = None
 
 
 class UserLogin(BaseModel):
     email: str
     password: str
 
-class UserUpdate(BaseModel):
-    email: str | None = None
-    full_name: str | None = None
-
-
 
 class UserResponse(BaseModel):
     user_id: uuid.UUID
     username: str | None
-    profile_image: str | None
+    email: EmailStr | None = None
+    profile_image: str | None = None
     
     created: datetime
     updated: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class UserUpdate(BaseModel):
+    email: str | None = None
+    full_name: str | None = None
+
+
 
 
 class LastPostResponse(BaseModel):

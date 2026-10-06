@@ -62,5 +62,15 @@ class UserService:
             raise ConflictException("Already following this user")
         self.repo.follow_user(follower_id, followed_id)
 
+    def unfollow_user(self, follower_id: UUID, followed_id: UUID) -> None:
+        if follower_id == followed_id:
+            raise ConflictException("You cannot unfollow yourself")
+        self.get_user_by_id(follower_id)
+        self.get_user_by_id(followed_id)
+        if not self.repo.is_following(follower_id, followed_id):
+            raise NotFoundException("Not following this user")
+        self.repo.unfollow_user(follower_id, followed_id)
+
     def get_all_users(self, skip: int = 0, limit: int = 100) -> list[User]:
         return self.repo.get_all(skip=skip, limit=limit)
+

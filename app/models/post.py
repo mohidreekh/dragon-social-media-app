@@ -12,7 +12,7 @@ from app.db.session import Base
 class PostStatus(str, Enum):
     PUBLIC = "PUBLIC"
     PRIVATE = "PRIVATE"
-    PUBLISHED = "published"
+
 
 
 class Post(Base):
