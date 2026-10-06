@@ -13,15 +13,11 @@ router = APIRouter(
 )
 
 
-@router.post(
-    "/",
-    response_model=PostResponse,
-    status_code=201
-)
-def create_post(
-    data: PostCreate,
-    current_user: CurrentUserDep,
-    service: PostServiceDep
-):
+@router.post("/", response_model=PostResponse, status_code=201)
+def create_post(data: PostCreate, current_user: CurrentUserDep, service: PostServiceDep):
     return service.create_post(data, user_id=current_user.user_id)
 
+
+@router.get("/", response_model=list[PostResponse])
+def get_posts(current_user: CurrentUserDep, service: PostServiceDep, skip: int = 0, limit: int = 10):
+    return service.get_posts(user_id=current_user.user_id, skip=skip, limit=limit)

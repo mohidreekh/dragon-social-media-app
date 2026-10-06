@@ -42,7 +42,7 @@ def get_my_profile(
 @router.get("/{id}", response_model=ProfileResponse)
 def get_user_profile(
     id: UUID,
-    current_user: CurrentUserDep,
+    # current_user: CurrentUserDep,
     service: UserServiceDep
 ):
     return service.get_user_profile(id)

@@ -18,7 +18,6 @@ class PostRepository:
         except ValueError:
             status_enum = PostStatus.PUBLIC
 
-
         post = Post(
             post_id=f"post_{uuid.uuid4().hex[:12]}",
             user_id=user_id,
@@ -31,3 +30,9 @@ class PostRepository:
         self.db.flush()
         self.db.refresh(post)
         return post
+
+    def get_posts(self, user_id: uuid.UUID, skip: int = 0, limit: int = 10) -> list[Post]:
+        return self.db.query(Post).filter(Post.user_id == user_id).offset(skip).limit(limit).all()
+    
+    def get_post_by_id(self, post_id: uuid.UUID) -> Post:
+        return self.db.query(Post).filter(Post.post_id == post_id).first()

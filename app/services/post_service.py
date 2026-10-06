@@ -17,3 +17,5 @@ class PostService:
             raise BadRequestException("Body is required")
         return self.repo.create_post(data, user_id=user_id)
 
+    def get_posts(self, user_id: UUID, skip: int = 0, limit: int = 10) -> list[Post]:
+        return self.repo.get_posts(user_id=user_id, skip=skip, limit=limit)

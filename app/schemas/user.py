@@ -20,18 +20,6 @@ class UserLogin(BaseModel):
     password: str
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: UserResponse
-
-
-class UserUpdate(BaseModel):
-    email: str | None = None
-    full_name: str | None = None
-
-
-
 class UserResponse(BaseModel):
     user_id: uuid.UUID
     username: str | None
@@ -42,6 +30,18 @@ class UserResponse(BaseModel):
     updated: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class UserUpdate(BaseModel):
+    email: str | None = None
+    full_name: str | None = None
+
 
 
 
