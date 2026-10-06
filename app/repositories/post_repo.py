@@ -1,11 +1,11 @@
-from typing import Annotated
 import uuid
-from sqlalchemy.orm import Session
-from fastapi import Depends
+
+from sqlalchemy import select
 
 from app.models.post import Post, PostStatus
 from app.core.dependencies import SessionDep
 from app.schemas.post import PostCreate
+
 
 class PostRepository:
     def __init__(self, db: SessionDep):
@@ -32,7 +32,9 @@ class PostRepository:
         return post
 
     def get_posts(self, user_id: uuid.UUID, skip: int = 0, limit: int = 10) -> list[Post]:
-        return self.db.query(Post).filter(Post.user_id == user_id).offset(skip).limit(limit).all()
-    
-    def get_post_by_id(self, post_id: uuid.UUID) -> Post:
-        return self.db.query(Post).filter(Post.post_id == post_id).first()
+        stmt = select(Post).where(Post.user_id == user_id).offset(skip).limit(limit)
+        return list(self.db.execute(stmt).scalars().all())
+
+    def get_post_by_id(self, post_id: str) -> Post | None:
+        stmt = select(Post).where(Post.post_id == post_id)
+        return self.db.execute(stmt).scalar_one_or_none()

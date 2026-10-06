@@ -1,93 +1,117 @@
+"""
+Tests for /api/auth endpoints:
+  POST /api/auth/register
+  POST /api/auth/login
+  GET  /api/auth/me
+"""
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-
-client = TestClient(app)
+from tests.conftest import auth_headers, register_user
 
 
-def test_full_auth_and_protected_endpoints():
-    # 1. Register User A
-    user_a_data = {
-        "username": "user_a",
-        "email": "user_a@example.com",
-        "password": "passwordA123",
-        "profile_image": "http://example.com/a.png"
-    }
-    resp_a = client.post("/api/auth/register", json=user_a_data)
-    if resp_a.status_code == 201:
-        token_a = resp_a.json()["access_token"]
-        user_a_id = resp_a.json()["user"]["user_id"]
-    else:
-        # Login if user A already exists
-        login_resp = client.post("/api/auth/login", json={"email": "user_a@example.com", "password": "passwordA123"})
-        token_a = login_resp.json()["access_token"]
-        me_resp = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_a}"})
-        user_a_id = me_resp.json()["user_id"]
+# ---------------------------------------------------------------------------
+# Register
+# ---------------------------------------------------------------------------
 
-    headers_a = {"Authorization": f"Bearer {token_a}"}
+class TestRegister:
+    def test_register_success(self, client: TestClient):
+        resp = client.post(
+            "/api/auth/register",
+            json={
+                "username": "alice",
+                "email": "alice@example.com",
+                "password": "secret123",
+            },
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert "access_token" in body
+        assert body["token_type"] == "bearer"
+        assert body["user"]["username"] == "alice"
+        assert "password" not in body["user"]
 
-    # 2. Register User B
-    user_b_data = {
-        "username": "user_b",
-        "email": "user_b@example.com",
-        "password": "passwordB123",
-        "profile_image": "http://example.com/b.png"
-    }
-    resp_b = client.post("/api/auth/register", json=user_b_data)
-    if resp_b.status_code == 201:
-        token_b = resp_b.json()["access_token"]
-        user_b_id = resp_b.json()["user"]["user_id"]
-    else:
-        login_resp = client.post("/api/auth/login", json={"email": "user_b@example.com", "password": "passwordB123"})
-        token_b = login_resp.json()["access_token"]
-        me_resp = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_b}"})
-        user_b_id = me_resp.json()["user_id"]
+    def test_register_duplicate_email(self, client: TestClient):
+        payload = {
+            "username": "bob",
+            "email": "bob@example.com",
+            "password": "secret123",
+        }
+        client.post("/api/auth/register", json=payload)  # first — OK
+        resp = client.post("/api/auth/register", json={**payload, "username": "bob2"})
+        assert resp.status_code == 409
 
-    headers_b = {"Authorization": f"Bearer {token_b}"}
+    def test_register_sets_cookie(self, client: TestClient):
+        resp = client.post(
+            "/api/auth/register",
+            json={
+                "username": "cookie_user",
+                "email": "cookie@example.com",
+                "password": "cookiepass",
+            },
+        )
+        assert resp.status_code == 201
+        assert "access_token" in client.cookies
 
-    # 3. Test invalid login
-    bad_login = client.post("/api/auth/login", json={"email": "user_a@example.com", "password": "wrongpassword"})
-    assert bad_login.status_code == 401
 
-    # 4. Get /auth/me for User A
-    me_resp = client.get("/api/auth/me", headers=headers_a)
-    assert me_resp.status_code == 200
-    assert me_resp.json()["username"] == "user_a"
+# ---------------------------------------------------------------------------
+# Login
+# ---------------------------------------------------------------------------
 
-    # 5. User A follows User B
-    follow_resp = client.post(f"/api/users/{user_b_id}/follow", headers=headers_a)
-    if follow_resp.status_code == 409:
-        # Already following, unfollow first
-        client.delete(f"/api/users/{user_b_id}/follow", headers=headers_a)
-        follow_resp = client.post(f"/api/users/{user_b_id}/follow", headers=headers_a)
-    
-    assert follow_resp.status_code == 201
-    assert follow_resp.json()["follower_id"] == user_a_id
-    assert follow_resp.json()["followed_id"] == user_b_id
+class TestLogin:
+    def test_login_success(self, client: TestClient):
+        register_user(client, "charlie", "charlie@example.com", "mypassword")
+        resp = client.post(
+            "/api/auth/login",
+            json={"email": "charlie@example.com", "password": "mypassword"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "access_token" in body
+        assert body["user"]["username"] == "charlie"
 
-    # 6. Check User B profile (followers count should be updated)
-    profile_b = client.get(f"/api/users/{user_b_id}", headers=headers_a)
-    assert profile_b.status_code == 200
-    assert profile_b.json()["followers_count"] >= 1
+    def test_login_wrong_password(self, client: TestClient):
+        register_user(client, "dave", "dave@example.com", "rightpass")
+        resp = client.post(
+            "/api/auth/login",
+            json={"email": "dave@example.com", "password": "wrongpass"},
+        )
+        assert resp.status_code == 401
 
-    # 7. User A unfollows User B
-    unfollow_resp = client.delete(f"/api/users/{user_b_id}/follow", headers=headers_a)
-    assert unfollow_resp.status_code == 200
+    def test_login_unknown_email(self, client: TestClient):
+        resp = client.post(
+            "/api/auth/login",
+            json={"email": "ghost@example.com", "password": "whatever"},
+        )
+        assert resp.status_code == 401
 
-    # 8. User A creates a post
-    post_resp = client.post("/api/posts/", json={"body": "Hello from User A"}, headers=headers_a)
-    assert post_resp.status_code == 201
+    def test_login_sets_cookie(self, client: TestClient):
+        register_user(client, "eve", "eve@example.com", "evepass")
+        resp = client.post(
+            "/api/auth/login",
+            json={"email": "eve@example.com", "password": "evepass"},
+        )
+        assert resp.status_code == 200
+        assert "access_token" in client.cookies
 
-    # 9. Get all users with auth
-    users_resp = client.get("/api/users/", headers=headers_a)
-    assert users_resp.status_code == 200
-    assert len(users_resp.json()) >= 2
 
-    # 10. Access protected route without token (should fail 401)
-    no_auth = client.get("/api/users/")
-    assert no_auth.status_code == 401
+# ---------------------------------------------------------------------------
+# /auth/me
+# ---------------------------------------------------------------------------
 
-    # 11. Access protected route with bad token (should fail 401)
-    bad_token = client.get("/api/users/", headers={"Authorization": "Bearer invalidtoken123"})
-    assert bad_token.status_code == 401
+class TestMe:
+    def test_me_with_valid_token(self, client: TestClient):
+        body = register_user(client, "frank", "frank@example.com", "frankpass")
+        token = body["access_token"]
+        resp = client.get("/api/auth/me", headers=auth_headers(token))
+        assert resp.status_code == 200
+        assert resp.json()["username"] == "frank"
+
+    def test_me_without_token(self, client: TestClient):
+        resp = client.get("/api/auth/me")
+        assert resp.status_code == 401
+
+    def test_me_with_invalid_token(self, client: TestClient):
+        resp = client.get("/api/auth/me", headers=auth_headers("bad.token.here"))
+        assert resp.status_code == 401
