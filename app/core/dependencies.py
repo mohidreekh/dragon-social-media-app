@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import UnauthorizedException
@@ -23,7 +24,7 @@ def get_current_user(
 ) -> User:
     token = token_from_header or access_token
     print("TOKEN:", token)
-    
+
     if not token or token in ("null", "undefined"):
         raise UnauthorizedException("Not authenticated")
 
@@ -38,7 +39,8 @@ def get_current_user(
     except ValueError:
         raise UnauthorizedException("Invalid user ID format in token")
 
-    user = db.query(User).filter(User.user_id == user_id).first()
+    stmt = select(User).where(User.user_id == user_id)
+    user = db.execute(stmt).scalar_one_or_none()
     if not user:
         raise UnauthorizedException("User not found")
 
